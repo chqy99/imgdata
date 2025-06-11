@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Literal, List
+from typing import Optional, Callable, Literal, List, Dict, Any
 import numpy as np
 
 @dataclass
@@ -43,6 +43,7 @@ class ImageObject:
     source_module: Optional[str] = None
     mask_path: Optional[str] = None
     mask_image_path: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -87,6 +88,7 @@ class ImageParseResult:
     full_embedding: Optional[np.ndarray] = None
     full_image_path: Optional[str] = None
     objects: List[ImageObject] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
