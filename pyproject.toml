@@ -1,16 +1,19 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "imgdata-core"
+name = "imgdata"
 version = "0.0.1"
-description = "Core data structures and interfaces for image parsing."
-authors = [{name="chqy99", email="you@example.com"}]
+description = "Modular core for structured image parsing."
+authors = [
+  { name = "你的名字", email = "you@example.com" }
+]
+license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 dependencies = []
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["core", "core.*"]
+[tool.setuptools]
+packages = ["imgdata.core"]
+package-dir = { "imgdata.core" = "core" }
