@@ -73,7 +73,7 @@ class ImageObject:
         else:
             # 如果 kwargs 中没有 bbox 参数，使用默认计算的值
             bbox = BBox.mask_to_bbox(mask)
-        mask_image = image[bbox.y1: bbox.y2, bbox.x1: bbox.x2] if bbox else None
+        mask_image = image[int(bbox.y1): int(bbox.y2), int(bbox.x1): int(bbox.x2)] if bbox else None
         instance = cls(
             image=image,
             mask=mask,
