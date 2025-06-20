@@ -30,8 +30,8 @@ class BBox:
 
 @dataclass
 class ImageObject:
-    id: str
     image: np.ndarray
+    id: Optional[str] = None
     mask: Optional[np.ndarray] = None
     mask_image: Optional[np.ndarray] = None
     type: Literal['ocr', 'icon', 'instance', 'region'] = 'region'
@@ -109,8 +109,8 @@ class ImageObject:
 
 @dataclass
 class ImageParseResult:
-    image_id: str
     full_image: np.ndarray
+    image_id: Optional[str] = None
     full_embedding: Optional[np.ndarray] = None
     full_image_path: Optional[str] = None
     objects: List[ImageObject] = field(default_factory=list)
