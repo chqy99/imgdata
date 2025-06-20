@@ -59,7 +59,7 @@ class ImageObject:
 
     @classmethod
     def from_mask(cls, image: np.ndarray, mask: np.ndarray, **kwargs) -> "ImageObject":
-        bbox = BBox.mask_to_bbox(mask)
+        bbox = kwargs.pop("bbox", BBox.mask_to_bbox(mask))
         mask_image = image[bbox.y1: bbox.y2, bbox.x1: bbox.x2] if bbox else None
         instance = cls(
             image=image,
