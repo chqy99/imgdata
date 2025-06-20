@@ -45,6 +45,32 @@ class ImageObject:
     mask_image_path: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @classmethod
+    def from_ocr(cls, image, bbox, text, score, **kwargs) -> "ImageObject":
+        instance = cls(
+            image=image,
+            type='ocr',
+            bbox=bbox,
+            text=text,
+            score=score,
+            **kwargs
+        )
+        return instance
+
+    @classmethod
+    def from_mask(cls, image: np.ndarray, mask: np.ndarray, **kwargs) -> "ImageObject":
+        bbox = BBox.mask_to_bbox(mask)
+        mask_image = image[bbox.y1: bbox.y2, bbox.x1: bbox.x2] if bbox else None
+        instance = cls(
+            image=image,
+            mask=mask,
+            bbox=bbox,
+            mask_image=mask_image,
+            type='instance',
+            **kwargs
+        )
+        return instance
+
     def to_dict(self) -> dict:
         return {
             'id': self.id,
