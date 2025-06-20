@@ -59,7 +59,20 @@ class ImageObject:
 
     @classmethod
     def from_mask(cls, image: np.ndarray, mask: np.ndarray, **kwargs) -> "ImageObject":
-        bbox = kwargs.pop("bbox", BBox.mask_to_bbox(mask))
+        bbox_input = kwargs.pop("bbox", None)
+        if bbox_input is not None:
+            # 如果 bbox_input 是数组，转换为 BBox 对象
+            if isinstance(bbox_input, list) or isinstance(bbox_input, np.ndarray):
+                # 假设数组形式为 [x1, y1, x2, y2]
+                bbox = BBox(bbox_input[0], bbox_input[1], bbox_input[2], bbox_input[3])
+            elif isinstance(bbox_input, BBox):
+                # 如果已经是 BBox 对象，直接使用
+                bbox = bbox_input
+            else:
+                raise ValueError("bbox must be a list, numpy array, or BBox instance")
+        else:
+            # 如果 kwargs 中没有 bbox 参数，使用默认计算的值
+            bbox = BBox.mask_to_bbox(mask)
         mask_image = image[bbox.y1: bbox.y2, bbox.x1: bbox.x2] if bbox else None
         instance = cls(
             image=image,
