@@ -67,9 +67,9 @@ class ImageParseItem:
         if not isinstance(self.score, list):
             self.score = [self.score]
 
-    def enrich(self, source_module, score, **kwargs):
-        self.source_module.extend(source_module)
-        self.score.extend(score)
+    def enrich(self, source_module: str, score: float, **kwargs):
+        self.source_module.append(source_module)
+        self.score.append(score)
         for key, value in kwargs.items():
             if key in self.__dataclass_fields__:
                 setattr(self, key, value)
