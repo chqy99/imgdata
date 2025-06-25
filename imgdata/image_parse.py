@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Callable, Literal, List, Dict, Any
 import numpy as np
 import cv2
-from storage_handler import FileHandler, EmbeddingHandler
+from .storage_handler import FileHandler, EmbeddingHandler
 import uuid
 import datetime
 
@@ -50,8 +50,8 @@ class BBox:
 @dataclass
 class ImageParseItem:
     image: np.ndarray
-    source_module: List[str] = field(default_factory=list)
-    score: List[float] = field(default_factory=list)
+    source_module: List[str]
+    score: List[float]
     bbox: BBox
     type: Literal["ocr", "icon", "instance", "region"] = "region"
     mask: Optional[np.ndarray] = None
