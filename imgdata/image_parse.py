@@ -1,10 +1,21 @@
+import base64
+import cv2
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Literal, List, Dict, Any
 import numpy as np
-import cv2
 from .storage_handler import FileHandler, EmbeddingHandler
 import uuid
 import datetime
+from io import BytesIO
+from PIL import Image
+
+
+def np_to_base64(img: np.ndarray, format: str = "PNG") -> str:
+    """将 numpy 图像转为 base64 字符串"""
+    pil_img = Image.fromarray(img.astype("uint8"))
+    buffer = BytesIO()
+    pil_img.save(buffer, format=format)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 @dataclass
@@ -88,6 +99,29 @@ class ImageParseItem:
             )
         return self.mask_image
 
+    def to_dict(self, filter: List[str] = []) -> Dict[str, Any]:
+        result = {
+            "source_module": self.source_module,
+            "score": self.score,
+            "type": self.type,
+            "label": self.label,
+            "text": self.text,
+            "bbox": (
+                self.bbox.to_dict() if hasattr(self.bbox, "to_dict") else str(self.bbox)
+            ),
+            "metadata": self.metadata,
+        }
+        if "image" in filter:
+            result["image"] = np_to_base64(self.image)
+        if "mask" in filter and self.mask is not None:
+            result["mask"] = np_to_base64(self.mask * 255)
+        if "bbox_image" in filter:
+            bbox_img = self.get_bbox_image()
+            result["bbox_image"] = np_to_base64(bbox_img)
+        if "mask_image" in filter and self.get_mask_image() is not None:
+            result["mask_image"] = np_to_base64(self.get_mask_image())
+        return result
+
 
 # 各个子项bbox的覆盖区域当作一个大的mask，再取原图像的mask_image，记为 bboxs_image
 # 各个子项mask的覆盖区域当作一个大的mask，再取原图像的mask_image，记为 masks_image
@@ -125,6 +159,19 @@ class ImageParseResult:
             self.masks = mask
             self.masks_image = self.image * (mask[..., None] > 0)
         return self.masks_image
+
+    def to_dict(self, filter: List[str] = []) -> Dict[str, Any]:
+        result = {
+            "metadata": self.metadata,
+            "items": [item.to_dict(filter=filter) for item in self.items],
+        }
+        if "image" in filter:
+            result["image"] = np_to_base64(self.image)
+        if "bboxs_image" in filter:
+            result["bboxs_image"] = np_to_base64(self.get_bboxs_image())
+        if "masks_image" in filter and self.get_masks_image() is not None:
+            result["masks_image"] = np_to_base64(self.get_masks_image())
+        return result
 
 
 class IDGenerator:
