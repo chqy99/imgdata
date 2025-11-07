@@ -2,16 +2,18 @@ import json
 import time
 from pynput import keyboard, mouse
 from threading import Thread, Lock
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Set
 import os
 
 class InputMonitor:
     def __init__(self, keyboard_interval: float = 0.1, mouse_interval: float = 0.1,
-                 output_interval: float = 1.0, output_file: str = "input_events.json"):
+                 output_interval: float = 1.0, output_file: str = "input_events.json",
+                 region: Optional[Tuple[int, int, int, int]] = None):
         self.keyboard_interval = keyboard_interval
         self.mouse_interval = mouse_interval
         self.output_interval = output_interval
         self.output_file = output_file
+        self.region = region
 
         self.events: List[Dict] = []
         self.events_lock = Lock()
@@ -23,44 +25,104 @@ class InputMonitor:
 
         self.last_keyboard_time = 0
         self.last_mouse_time = 0
+        # Track currently pressed keys and per-key throttle timestamps
+        self.pressed_keys: Set[str] = set()
+        self.key_last_time: Dict[str, float] = {}
+
+    # --- Keyboard helpers ---
+    def _normalize_key(self, key) -> str:
+        """Normalize pynput key/keycode into a concise, stable name.
+        Examples: Key.ctrl_l -> 'Ctrl', Key.shift -> 'Shift', 'a' -> 'a', Key.f1 -> 'F1'."""
+        try:
+            # KeyCode with printable character
+            if hasattr(key, 'char') and key.char is not None:
+                return key.char
+        except Exception:
+            pass
+
+        # Fallback to string form
+        name = str(key)
+        if name.startswith('Key.'):
+            name = name[4:]
+        # Unify left/right modifier keys and common specials
+        aliases = {
+            'ctrl': 'Ctrl', 'ctrl_l': 'Ctrl', 'ctrl_r': 'Ctrl',
+            'shift': 'Shift', 'shift_l': 'Shift', 'shift_r': 'Shift',
+            'alt': 'Alt', 'alt_l': 'Alt', 'alt_r': 'Alt',
+            'cmd': 'Meta', 'cmd_l': 'Meta', 'cmd_r': 'Meta', 'super': 'Meta', 'cmd_r': 'Meta', 'super_l': 'Meta', 'super_r': 'Meta',
+            'enter': 'Enter', 'return': 'Enter', 'space': 'Space', 'tab': 'Tab', 'esc': 'Esc', 'escape': 'Esc',
+            'backspace': 'Backspace', 'delete': 'Delete', 'home': 'Home', 'end': 'End', 'page_up': 'PageUp', 'page_down': 'PageDown',
+            'up': 'Up', 'down': 'Down', 'left': 'Left', 'right': 'Right'
+        }
+        if name in aliases:
+            return aliases[name]
+        if name.startswith('f') and name[1:].isdigit():
+            return name.upper()  # F1-F24
+        # Default: capitalize words joined by '-'
+        return name.replace('_', ' ').title().replace(' ', '')
+
+    def _sorted_pressed(self) -> List[str]:
+        order = {'Ctrl': 0, 'Shift': 1, 'Alt': 2, 'Meta': 3}
+        return sorted(self.pressed_keys, key=lambda k: (order.get(k, 4), k))
 
     def on_press(self, key):
-        current_time = time.time()
-        if current_time - self.last_keyboard_time >= self.keyboard_interval:
-            try:
-                key_char = key.char
-            except AttributeError:
-                key_char = str(key)
+        now = time.time()
+        key_name = self._normalize_key(key)
 
+        # Update current pressed set (prevent duplicates)
+        if key_name not in self.pressed_keys:
+            self.pressed_keys.add(key_name)
+
+        # Per-key throttle to avoid auto-repeat flood, but don't block other keys
+        last = self.key_last_time.get(key_name, 0)
+        if now - last >= self.keyboard_interval:
             with self.events_lock:
-                self.events.append({
+                data = {
                     'type': 'keyboard',
                     'event': 'press',
-                    'key': key_char,
-                    'timestamp': current_time
-                })
-            self.last_keyboard_time = current_time
+                    'key': key_name,
+                    'pressed_keys': self._sorted_pressed(),
+                    'combo': '+'.join(self._sorted_pressed()) if len(self.pressed_keys) > 1 else key_name,
+                    'timestamp': now
+                }
+                self.events.append(data)
+            self.key_last_time[key_name] = now
 
     def on_release(self, key):
-        current_time = time.time()
-        if current_time - self.last_keyboard_time >= self.keyboard_interval:
-            try:
-                key_char = key.char
-            except AttributeError:
-                key_char = str(key)
+        now = time.time()
+        key_name = self._normalize_key(key)
 
+        # Remove from pressed set, but compute combo after removal to reflect state change
+        if key_name in self.pressed_keys:
+            self.pressed_keys.remove(key_name)
+
+        last = self.key_last_time.get(key_name, 0)
+        if now - last >= self.keyboard_interval:
             with self.events_lock:
-                self.events.append({
+                data = {
                     'type': 'keyboard',
                     'event': 'release',
-                    'key': key_char,
-                    'timestamp': current_time
-                })
-            self.last_keyboard_time = current_time
+                    'key': key_name,
+                    'pressed_keys': self._sorted_pressed(),
+                    'combo': '+'.join(self._sorted_pressed()) if len(self.pressed_keys) > 1 else (self._sorted_pressed()[0] if self.pressed_keys else ''),
+                    'timestamp': now
+                }
+                self.events.append(data)
+            self.key_last_time[key_name] = now
+
+    def set_region(self, region: Optional[Tuple[int, int, int, int]]):
+        self.region = region
+
+    def _is_point_in_region(self, x: float, y: float) -> bool:
+        if not self.region:
+            return True
+        left, top, width, height = self.region
+        px, py = int(x), int(y)
+        return left <= px < left + width and top <= py < top + height
 
     def on_move(self, x, y):
         current_time = time.time()
-        if current_time - self.last_mouse_time >= self.mouse_interval:
+        if current_time - self.last_mouse_time >= self.mouse_interval and self._is_point_in_region(x, y):
             with self.events_lock:
                 self.events.append({
                     'type': 'mouse',
@@ -73,7 +135,7 @@ class InputMonitor:
 
     def on_click(self, x, y, button, pressed):
         current_time = time.time()
-        if current_time - self.last_mouse_time >= self.mouse_interval:
+        if current_time - self.last_mouse_time >= self.mouse_interval and self._is_point_in_region(x, y):
             with self.events_lock:
                 self.events.append({
                     'type': 'mouse',
@@ -88,7 +150,7 @@ class InputMonitor:
 
     def on_scroll(self, x, y, dx, dy):
         current_time = time.time()
-        if current_time - self.last_mouse_time >= self.mouse_interval:
+        if current_time - self.last_mouse_time >= self.mouse_interval and self._is_point_in_region(x, y):
             with self.events_lock:
                 self.events.append({
                     'type': 'mouse',
@@ -117,7 +179,9 @@ class InputMonitor:
             self.is_running = True
 
             # Create output directory if it doesn't exist
-            os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+            output_dir = os.path.dirname(self.output_file)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
 
             # Start keyboard listener
             self.keyboard_listener = keyboard.Listener(

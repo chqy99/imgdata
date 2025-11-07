@@ -150,6 +150,14 @@ class RecorderUI(tk.Tk):
         video_file = os.path.join(self.output_dir, f'recording_{timestamp}.mp4')
         input_file = os.path.join(self.output_dir, f'inputs_{timestamp}.json')
 
+        rect_info = window_data.rect.to_dict()
+        region = (
+            rect_info['left'],
+            rect_info['top'],
+            rect_info['width'],
+            rect_info['height']
+        )
+
         # Reset stop event
         self.stop_event.clear()
 
@@ -158,7 +166,8 @@ class RecorderUI(tk.Tk):
             keyboard_interval=float(self.keyboard_var.get()),
             mouse_interval=float(self.mouse_var.get()),
             output_interval=float(self.output_var.get()),
-            output_file=input_file
+            output_file=input_file,
+            region=region
         )
 
         def input_monitor_thread():
@@ -175,7 +184,15 @@ class RecorderUI(tk.Tk):
         except Exception as e:
             print(f"Error focusing window: {e}")
 
+        # Refresh region in case the window manager adjusted geometry when focusing
         rect = window_data.rect.to_dict()
+        region = (
+            rect['left'],
+            rect['top'],
+            rect['width'],
+            rect['height']
+        )
+        self.input_monitor.set_region(region)
         self.screen_recorder = ScreenRecorder(
             output_file=video_file,
             region=(rect['left'], rect['top'],
