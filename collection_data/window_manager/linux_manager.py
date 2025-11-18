@@ -31,7 +31,11 @@ def _get_client_geometry(win_id: str) -> WindowRect:
         raise RuntimeError("请先安装 xwininfo (sudo apt install x11-utils)")
 
     def extract(key: str) -> int:
-        return int(re.search(rf"{key}:\s+(\d+)", xwi_out).group(1))
+        match = re.search(rf"{key}:\s+(\d+)", xwi_out)
+        if match:
+            return int(match.group(1))
+        else:
+            return 0  # or None, depending on desired behavior
 
     abs_x = extract("Absolute upper-left X")
     abs_y = extract("Absolute upper-left Y")
