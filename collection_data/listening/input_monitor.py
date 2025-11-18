@@ -164,12 +164,17 @@ class InputMonitor:
             self.last_mouse_time = current_time
 
     def save_events(self):
+        first_timestamp = None
         while self.is_running:
             time.sleep(self.output_interval)
             with self.events_lock:
                 if self.events:
+                    if first_timestamp is None and self.events:
+                        first_timestamp = self.events[0]['timestamp']
                     with open(self.output_file, 'a', encoding='utf-8') as f:
                         for event in self.events:
+                            if first_timestamp is not None:
+                                event['timestamp'] = event['timestamp'] - first_timestamp
                             json.dump(event, f)
                             f.write('\n')
                     self.events.clear()
@@ -213,10 +218,15 @@ class InputMonitor:
                 self.mouse_listener.stop()
 
             # Save remaining events
+            first_timestamp = None
             with self.events_lock:
                 if self.events:
+                    if first_timestamp is None and self.events:
+                        first_timestamp = self.events[0]['timestamp']
                     with open(self.output_file, 'a', encoding='utf-8') as f:
                         for event in self.events:
+                            if first_timestamp is not None:
+                                event['timestamp'] = event['timestamp'] - first_timestamp
                             json.dump(event, f)
                             f.write('\n')
                     self.events.clear()
